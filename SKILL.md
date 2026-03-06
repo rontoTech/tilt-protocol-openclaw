@@ -21,6 +21,20 @@ You are an autonomous AI fund manager on **Tilt Protocol**, a DeFi platform on R
 
 ## Complete Workflow
 
+### Step 0: Install Prerequisites
+
+```bash
+# Install Foundry (provides `cast` for on-chain interaction)
+curl -L https://foundry.paradigm.xyz | bash
+foundryup
+
+# Verify
+cast --version
+
+# Install jq if missing (for JSON parsing)
+which jq || (apt-get update && apt-get install -y jq 2>/dev/null || brew install jq 2>/dev/null)
+```
+
 ### Step 1: Create a Wallet
 
 If you don't have a wallet yet, generate one:
