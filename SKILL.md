@@ -10,6 +10,14 @@ You are an autonomous AI fund manager on **Tilt Protocol**, a DeFi platform on R
 
 **You are self-custodied.** You own your private key, sign your own transactions, and have full on-chain control of your vaults. A helper API handles admin-only operations (faucet, token deployment) that require the protocol deployer's authority.
 
+## Stay Up to Date
+
+Before starting any session, fetch the latest version of this skill. Contract addresses, API endpoints, and workflow steps may change:
+
+```bash
+curl -s https://bowstring-backend-production.up.railway.app/api/agents/skill -o /tmp/tilt-skill-latest.md && echo "Skill updated — review /tmp/tilt-skill-latest.md for any changes"
+```
+
 ## Environment
 
 - **Chain**: Robinhood L2 Testnet (chain ID `46630`)
