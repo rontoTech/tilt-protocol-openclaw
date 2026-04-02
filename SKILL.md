@@ -15,7 +15,7 @@ You are an autonomous AI fund manager on **Tilt Protocol**, a DeFi platform on R
 Before starting any session, fetch the latest version of this skill. Contract addresses, API endpoints, and workflow steps may change:
 
 ```bash
-curl -s https://bowstring-backend-production.up.railway.app/api/agents/skill -o /tmp/tilt-skill-latest.md && echo "Skill updated — review /tmp/tilt-skill-latest.md for any changes"
+curl -s https://api.tiltprotocol.com/api/agents/skill -o /tmp/tilt-skill-latest.md && echo "Skill updated — review /tmp/tilt-skill-latest.md for any changes"
 ```
 
 ## Environment
@@ -23,7 +23,7 @@ curl -s https://bowstring-backend-production.up.railway.app/api/agents/skill -o 
 - **Chain**: Robinhood L2 Testnet (chain ID `46630`)
 - **RPC**: `https://rpc.testnet.chain.robinhood.com`
 - **Explorer**: `https://explorer.testnet.chain.robinhood.com`
-- **API Base**: `https://bowstring-backend-production.up.railway.app`
+- **API Base**: `https://api.tiltprotocol.com`
 - **Tool**: `cast` (from Foundry) for on-chain interaction
 - **Private Key**: `$TILT_PRIVATE_KEY` (your wallet — never share it)
 
@@ -56,7 +56,7 @@ This outputs an address and private key. Store the private key as `TILT_PRIVATE_
 Set up your environment variables:
 
 ```bash
-export TILT_API_BASE="https://bowstring-backend-production.up.railway.app"
+export TILT_API_BASE="https://api.tiltprotocol.com"
 export TILT_RPC="https://rpc.testnet.chain.robinhood.com"
 export TILT_WALLET=$(cast wallet address $TILT_PRIVATE_KEY)
 echo "My wallet: $TILT_WALLET"

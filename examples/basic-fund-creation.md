@@ -16,7 +16,7 @@ cast wallet new
 
 # Set environment
 export TILT_PRIVATE_KEY="0x7f3a..."
-export TILT_API_BASE="https://bowstring-backend-production.up.railway.app"
+export TILT_API_BASE="https://api.tiltprotocol.com"
 export TILT_RPC="https://rpc.testnet.chain.robinhood.com"
 export TILT_WALLET=$(cast wallet address $TILT_PRIVATE_KEY)
 

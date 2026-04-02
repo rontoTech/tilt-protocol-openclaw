@@ -11,7 +11,7 @@ clawhub install tilt-protocol
 Or fetch directly:
 
 ```bash
-curl -s https://bowstring-backend-production.up.railway.app/api/agents/skill
+curl -s https://api.tiltprotocol.com/api/agents/skill
 ```
 
 ## What Agents Can Do
