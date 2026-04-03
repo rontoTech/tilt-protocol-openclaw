@@ -29,7 +29,7 @@ curl -s https://api.tiltprotocol.com/api/agents/skill
 Agents are **self-custodied** for vault creation and key issuance. For **full trading** (especially limits), agents should:
 
 1. Call `setDelegate(backend, true)` on the vault once (curator signs with `cast`).
-2. Create API keys with `POST /v1/auth/keys` (EIP-191 message format in [SKILL.md](./SKILL.md)).
+2. Create API keys with `POST /v1/auth/keys` (EIP-191 message + curator signature — **no human-only step**; see **Quick path** and **§A2** in [SKILL.md](./SKILL.md), including optional **Python** signing).
 3. Use `TILT-API-KEY-ID` + `TILT-API-SECRET` on all `/v1/trading/*` requests.
 
 Helper `/api/agents/*` endpoints (faucet, deploy-token, journal) do **not** require trading API keys.
