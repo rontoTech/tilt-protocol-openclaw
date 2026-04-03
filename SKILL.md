@@ -36,7 +36,7 @@ Before starting any session, fetch the latest version of this skill. Contract ad
 curl -s https://api.tiltprotocol.com/api/agents/skill -o /tmp/tilt-skill-latest.md && echo "Skill updated — review /tmp/tilt-skill-latest.md for any changes"
 ```
 
-Official API narrative docs (market vs limit, fill logic, errors): Trading API repo / docs — search for **Fund Manager Trading Guide** and **Orders** on the Tilt documentation site.
+Official API narrative docs (market vs limit, fill logic, errors, **relayer nonces / `client_order_id`**): **Fund Manager Trading Guide** and **Orders** (Tilt API docs — relayer §12, orders “Relayer, nonces, and burst market orders”).
 
 ## Environment
 
@@ -230,6 +230,7 @@ Every `/v1/trading/*` call needs:
 | `time_in_force` | yes | `day`, `gtc`, `gtd`, `ioc`, or `fok` — use **`gtc`** for limits that must survive overnight / off-hours |
 | `limit_price` | limit only | USD per share (string) |
 | `expires_at` | gtd only | ISO-8601 |
+| `client_order_id` | **recommended** | Unique per intended order — **idempotent** retries (see **§A4a**). |
 
 **Market buy (USD notional):**
 
@@ -243,7 +244,8 @@ curl -s -X POST "$TILT_API_BASE/v1/trading/orders" \
     "notional": "2500",
     "side": "buy",
     "type": "market",
-    "time_in_force": "day"
+    "time_in_force": "day",
+    "client_order_id": "nvda-buy-'"$(date +%s)"'"
   }' | jq .
 ```
 
@@ -272,6 +274,30 @@ curl -s -X POST "$TILT_API_BASE/v1/trading/orders" \
 Poll `GET /v1/trading/orders/:id` or `GET /v1/trading/orders?status=open` until `filled`, `canceled`, `expired`, or `rejected`.
 
 **`day` orders** may be expired when the service treats the US equity session as closed. For “leave it working overnight” use **`gtc`** or **`gtd`**.
+
+### A4a. Relayer nonces, `client_order_id`, and burst orders (required reading for automation)
+
+**Who signs:** Market fills and limit-order keeper fills use the **backend relayer** (same address as **`setDelegate`** in §A1: `0xd3f9Dcd6011E1aA13eEB277d9CE5F2f7c9BB6070`). All its on-chain txs share one **nonce** counter.
+
+**Historical bug (stress test, Apr 2026):** Submitting **many market orders in quick succession** sometimes returned **`rejected`** with **`nonce has already been used`**, while a tx was **still pending** and could **confirm later** — causing **double fills** (e.g. JPM, GE, V, MSFT) if the agent **immediately retried** with a new request.
+
+**Platform fix:** The backend **serializes** relayer transactions and assigns **explicit nonces** so parallel HTTP requests are processed **one after another** (price push + trade per order). You should still follow safe client patterns.
+
+**`client_order_id` (idempotency):**
+
+| Behavior | Detail |
+|----------|--------|
+| **Always set it** | Unique string per *intended* order for this vault (UUID, `runId-symbol-leg`, etc.). |
+| **Duplicate POST** | Same `client_order_id` + same vault → API returns **HTTP 200** with the **existing** order — **no second trade**. |
+| **Retry after error** | If unsure whether a `rejected` order filled, **reuse the same** `client_order_id` on retry to avoid duplicates; or verify positions first, then use a **new** id only for a genuinely new intent. |
+
+**After `rejected` (especially if `error_message` mentions nonce):**
+
+1. `GET /v1/trading/orders/:id` if you stored the `id`.
+2. `GET /v1/trading/positions` and `GET /v1/trading/account` — confirm whether balances moved.
+3. Only then submit a **new** trade with a **new** `client_order_id` if you still need execution.
+
+**Docs:** Tilt **Orders** and **Fund Manager Trading Guide** (API docs repo) — sections on relayer / nonces / burst market orders and §12 safe automation.
 
 ### A5. List, fetch, cancel orders
 

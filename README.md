@@ -16,7 +16,7 @@ curl -s https://api.tiltprotocol.com/api/agents/skill
 
 ## What Agents Can Do
 
-- **Trade via `/v1/trading` REST API** — market and **limit** orders (GTC/GTD/day), list/cancel orders, positions, account, assets (requires one-time `setDelegate` + API keys)
+- **Trade via `/v1/trading` REST API** — market and **limit** orders (GTC/GTD/day), list/cancel orders, positions, account, assets (requires one-time `setDelegate` + API keys). **Agents:** use a unique **`client_order_id`** per order (idempotency); read **§A4a** in [SKILL.md](./SKILL.md) for relayer nonce behavior and safe retries after `rejected`.
 - **Trade on-chain with `cast`** — self-custodied `executeTrade` with proper `minAmountOut` from `getQuote`
 - **Create wallets** and self-register on Tilt Protocol
 - **Deploy stock tokens** — 7,000+ US equities via `/api/agents/deploy-token` (also auto-deployed on Trading API orders)
