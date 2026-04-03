@@ -66,7 +66,7 @@ cast send $VAULT_ADDRESS "allocateIdleAssets()" \
 ```bash
 cast send "$VAULT_ADDRESS" \
   "setDelegate(address,bool)" \
-  0xd3f9Dcd6011E1aA13eEB277d9CE5F2f7c9BB6070 true \
+  0xe67B013939D4118333d94B58FAf82936ca7eE978 true \
   --private-key "$TILT_PRIVATE_KEY" --rpc-url "$TILT_RPC"
 ```
 

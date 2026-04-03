@@ -65,12 +65,12 @@ Use this path for **market orders, limit orders, open-order management, position
 1. A **vault** exists and `$TILT_WALLET` is its **curator** (vault creator).
 2. The **backend delegate** is authorized on the vault (one-time on-chain). The delegate address used by the app and keeper is:
 
-`0xd3f9Dcd6011E1aA13eEB277d9CE5F2f7c9BB6070`
+`0xe67B013939D4118333d94B58FAf82936ca7eE978`
 
 ```bash
 cast send "$VAULT_ADDRESS" \
   "setDelegate(address,bool)" \
-  0xd3f9Dcd6011E1aA13eEB277d9CE5F2f7c9BB6070 true \
+  0xe67B013939D4118333d94B58FAf82936ca7eE978 true \
   --private-key "$TILT_PRIVATE_KEY" \
   --rpc-url "$TILT_RPC"
 ```
@@ -80,7 +80,7 @@ cast send "$VAULT_ADDRESS" \
 ```bash
 cast call "$VAULT_ADDRESS" \
   "delegates(address)(bool)" \
-  0xd3f9Dcd6011E1aA13eEB277d9CE5F2f7c9BB6070 \
+  0xe67B013939D4118333d94B58FAf82936ca7eE978 \
   --rpc-url "$TILT_RPC"
 # should return: true
 ```
@@ -277,7 +277,7 @@ Poll `GET /v1/trading/orders/:id` or `GET /v1/trading/orders?status=open` until 
 
 ### A4a. Relayer nonces, `client_order_id`, and burst orders (required reading for automation)
 
-**Who signs:** Market fills and limit-order keeper fills use the **backend relayer** (same address as **`setDelegate`** in §A1: `0xd3f9Dcd6011E1aA13eEB277d9CE5F2f7c9BB6070`). All its on-chain txs share one **nonce** counter.
+**Who signs:** Market fills and limit-order keeper fills use the **backend relayer** (via the proxy address in §A1: `0xe67B013939D4118333d94B58FAf82936ca7eE978`). All its on-chain txs share one **nonce** counter.
 
 **Historical bug (stress test, Apr 2026):** Submitting **many market orders in quick succession** sometimes returned **`rejected`** with **`nonce has already been used`**, while a tx was **still pending** and could **confirm later** — causing **double fills** (e.g. JPM, GE, V, MSFT) if the agent **immediately retried** with a new request.
 
@@ -542,7 +542,7 @@ curl -s -X POST "$TILT_API_BASE/api/agents/faucet" \
 | VaultRegistry | `0xBe4447B2381928614a91cEf4Bac2c34CeF539a22` |
 | FeeManager | `0x7998d44B847Df1F86A721E5Dd34106BD1Ff541d4` |
 | RebalanceEngine | `0xe6C1Ed308d01F6f5E33B51b436C1Bb642521A02c` |
-| Backend delegate (setDelegate) | `0xd3f9Dcd6011E1aA13eEB277d9CE5F2f7c9BB6070` |
+| Backend delegate (setDelegate) | `0xe67B013939D4118333d94B58FAf82936ca7eE978` |
 
 ## Common Token Addresses
 
