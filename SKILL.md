@@ -36,7 +36,7 @@ Before starting any session, fetch the latest version of this skill. Contract ad
 curl -s https://api.tiltprotocol.com/api/agents/skill -o /tmp/tilt-skill-latest.md && echo "Skill updated — review /tmp/tilt-skill-latest.md for any changes"
 ```
 
-Official API narrative docs (market vs limit, fill logic, errors, **relayer nonces / `client_order_id`**): **Fund Manager Trading Guide** and **Orders** (Tilt API docs — relayer §12, orders “Relayer, nonces, and burst market orders”).
+Official API narrative docs (market vs limit, fill logic, errors, **relayer nonces / `client_order_id`**, **`avg_entry_price` / stop-loss patterns**): **Fund Manager Trading Guide** (§11–13) and **Orders** / **Positions** (Tilt API docs — relayer §12, orders “Relayer, nonces, and burst market orders”, positions “avg_entry_price — how it is calculated”).
 
 ## Environment
 
@@ -330,6 +330,37 @@ curl -s "$TILT_API_BASE/v1/trading/assets?q=AAPL&limit=20" \
   -H "TILT-API-KEY-ID: $TILT_API_KEY_ID" \
   -H "TILT-API-SECRET: $TILT_API_SECRET" | jq .
 ```
+
+**Position response shape:**
+
+```json
+{
+  "symbol": "AAPL",
+  "asset_id": "0x...token_address",
+  "qty": "26.315789",
+  "market_value": "5000.00",
+  "current_price": "190.00",
+  "avg_entry_price": "181.42",
+  "side": "long",
+  "exchange": "TILT"
+}
+```
+
+`avg_entry_price` is the **weighted-average cost basis** (AVCO) across all filled buy orders for that symbol in your vault. It is populated automatically on every fill — use it directly for stop-loss, take-profit, and P&L calculations without any external state file.
+
+```python
+# Stop-loss pattern — no manual state tracking needed
+for p in requests.get(f"{BASE}/v1/trading/positions", headers=HDR).json():
+    if p["avg_entry_price"] is None:
+        continue  # position built outside the API (direct on-chain swap)
+    pnl_pct = (float(p["current_price"]) - float(p["avg_entry_price"])) / float(p["avg_entry_price"]) * 100
+    if pnl_pct <= -15:  # 15 % stop-loss from entry
+        requests.post(f"{BASE}/v1/trading/orders", headers=HDR,
+            json={"symbol": p["symbol"], "qty": p["qty"], "side": "sell",
+                  "type": "market", "client_order_id": f"sl-{p['symbol']}-{int(time.time())}"})
+```
+
+`avg_entry_price` is `null` only when the position was built entirely via direct on-chain swaps that bypassed the trading API. For any position that was ever opened through the API, the server auto-backfills from order history on the first `/positions` call if the key was not yet stored.
 
 Resting limit orders are stored in **Upstash Redis** (`tilt:order:*`, `tilt:open-orders`); the **limit-order keeper** (backend) polls and submits on-chain fills when price rules pass.
 
