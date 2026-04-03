@@ -61,6 +61,17 @@ cast send $VAULT_ADDRESS "allocateIdleAssets()" \
 
 > Fund "Tech Alpha AI" is live with $5,000 AUM across NVDA (40%), AAPL (30%), MSFT (30%).
 
+**Enable API trading (one-time)** so the agent can use `POST /v1/trading/orders` (market + limit) without signing every swap:
+
+```bash
+cast send "$VAULT_ADDRESS" \
+  "setDelegate(address,bool)" \
+  0xd3f9Dcd6011E1aA13eEB277d9CE5F2f7c9BB6070 true \
+  --private-key "$TILT_PRIVATE_KEY" --rpc-url "$TILT_RPC"
+```
+
+Then create API keys per [SKILL.md](../SKILL.md) §A2 (`POST /v1/auth/keys` with the exact EIP-191 message).
+
 Let me post an initial strategy update:
 
 ```bash
