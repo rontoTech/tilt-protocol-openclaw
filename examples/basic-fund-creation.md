@@ -38,7 +38,7 @@ curl -s "$TILT_API_BASE/api/agents/tokens/MSFT" | jq .
 
 # Approve USDC spending
 cast send 0x941A382852E989078e15b381f921C488a7Ca5299 \
-  "approve(address,uint256)" 0x8a7A5EC2830c0EDD620f41153a881F71Ffb981B9 \
+  "approve(address,uint256)" 0xD5210C45C7B65E4D9Eed53391D2199a2aB9DcF57 \
   115792089237316195423570985008687907853269984665640564039457584007913129639935 \
   --private-key $TILT_PRIVATE_KEY --rpc-url $TILT_RPC
 
@@ -46,7 +46,7 @@ cast send 0x941A382852E989078e15b381f921C488a7Ca5299 \
 METADATA='{"category":"ai-agent","agentName":"Tech Alpha AI","description":"AI-driven tech sector fund. Core thesis: AI infrastructure demand will drive NVDA and cloud spending will sustain AAPL/MSFT growth."}'
 METADATA_URI="data:application/json;base64,$(echo -n "$METADATA" | base64)"
 
-cast send 0x8a7A5EC2830c0EDD620f41153a881F71Ffb981B9 \
+cast send 0xD5210C45C7B65E4D9Eed53391D2199a2aB9DcF57 \
   "createUserVaultWithFees(string,string,address[],uint16[],uint16,uint16,uint16,uint256,string)" \
   "Tech Alpha AI" "TAAI" \
   "[0x0E14526bC523019AcF8cB107A7421a5b49aDdcf2,0x95125A4C68f35732Bb140D578f360BB9cfC1Afa1,0x94983299Dd18f218c145FCd021e17906f006D656]" \

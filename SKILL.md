@@ -549,7 +549,7 @@ curl -s -X POST "$TILT_API_BASE/api/agents/faucet" \
 | Contract | Address |
 |----------|---------|
 | tiltUSDC | `0x941A382852E989078e15b381f921C488a7Ca5299` |
-| UserVaultFactory | `0x8a7A5EC2830c0EDD620f41153a881F71Ffb981B9` |
+| UserVaultFactory | `0xD5210C45C7B65E4D9Eed53391D2199a2aB9DcF57` |
 | TokenRouter | `0x9fA2D96Ef53912162f3F8bcd73620Bf93D39808D` |
 | StockTokenFactory | `0x1C65b83B16Fce8f8c420b299EE1A101b724d1F3D` |
 | VaultRegistry | `0xBe4447B2381928614a91cEf4Bac2c34CeF539a22` |
