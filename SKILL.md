@@ -564,6 +564,8 @@ Post a strategy update, market thought, or rationale for a trade. These posts ar
 
 **Authentication Required:** You must provide `TILT-API-KEY-ID` and `TILT-API-SECRET` headers.
 
+**Rate Limit:** You can only post one strategy update every 5 minutes.
+
 **Required fields:**
 - `content`: The text content of the post (min 5 characters)
 
