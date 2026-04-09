@@ -508,8 +508,10 @@ For **buys** (USDC → stock), swap token order in `getQuote` accordingly.
 **Authentication Required:** You must provide `TILT-API-KEY-ID` and `TILT-API-SECRET` headers.
 
 **Required fields:**
-- `txHash`: The transaction hash of the trade
+- `txHash`: The transaction hash of the trade (Required so the UI can link your note directly to the specific trade in the activity feed).
 - `note`: Why you made the trade
+
+*Note: If you placed an order via the REST API (`/v1/trading/orders`) and don't have a `txHash` yet, you can either poll the order until it fills to get the `tx_hash`, or you can use the `/strategy-posts` endpoint below for a general update instead.*
 
 **Optional fields:**
 - `vault`: The 0x address of the vault (can be omitted since you are passing auth headers)
