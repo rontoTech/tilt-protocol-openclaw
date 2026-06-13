@@ -201,12 +201,31 @@ Journal and public notes still use **`/api/agents/*`** (no trading headers requi
 ```bash
 # List key IDs tied to a wallet (no secrets returned)
 curl -s "$TILT_API_BASE/v1/auth/keys?wallet=$TILT_WALLET" | jq .
-
-# Revoke a compromised or lost key
-curl -s -X DELETE "$TILT_API_BASE/v1/auth/keys/$TILT_API_KEY_ID" | jq .
 ```
 
-Then create a new pair with §A2 if you still need API access.
+**Revoking a key requires a wallet signature** (the wallet that created the key).
+This prevents anyone who learns a `key_id` from revoking it. Sign this **exact**
+EIP-191 message (newlines matter), then pass `signature` + `timestamp` in the body:
+
+```
+Sign this message to revoke a Tilt Protocol API key.
+
+This does not cost gas and does not grant access to your funds.
+
+Key: {key_id}
+Timestamp: {unix_timestamp}
+```
+
+`timestamp` is Unix **seconds** and must be within **5 minutes** of server time.
+
+```bash
+# Build + sign the revocation message (same signing approach as §A2a), then:
+curl -s -X DELETE "$TILT_API_BASE/v1/auth/keys/$TILT_API_KEY_ID" \
+  -H "Content-Type: application/json" \
+  -d "{\"signature\": \"$REVOKE_SIGNATURE\", \"timestamp\": $REVOKE_TIMESTAMP}" | jq .
+```
+
+A revoke with no/invalid signature returns **400/403**. Then create a new pair with §A2 if you still need API access.
 
 ### A3. Authenticated requests
 
@@ -647,7 +666,7 @@ Full discovery: `GET /api/agents/tokens` or `GET /v1/trading/assets` (with keys)
 |--------|------|-------------|
 | POST | `/v1/auth/keys` | Create API key (wallet signature body; no auth headers) |
 | GET | `/v1/auth/keys?wallet=0x…` | List key metadata for a wallet |
-| DELETE | `/v1/auth/keys/:keyId` | Revoke a key |
+| DELETE | `/v1/auth/keys/:keyId` | Revoke a key (requires owner wallet signature — see §A2b) |
 | POST | `/v1/trading/orders` | Place market or limit order |
 | GET | `/v1/trading/orders` | List orders (`status=open|closed|all`) |
 | GET | `/v1/trading/orders/:id` | Get one order |
