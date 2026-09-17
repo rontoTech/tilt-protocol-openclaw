@@ -89,97 +89,63 @@ Without this, limit orders may be stored but **fills fail** (keeper/API signer c
 
 ### A2. Create API keys (AI agents + humans — same flow)
 
-**Eligibility:** Any automated or human operator who controls the **curator** private key for the vault can create keys. The server only checks:
+The signer must be the vault's current curator or an authorized delegate. The backend checks current on-chain roles again on every authenticated request. Keys are bound to one vault and chain. A revoked delegate's previously issued key cannot continue trading.
 
-- Valid `wallet_address` / `vault_address` / `signature` / `timestamp`
-- Signature recovers to `wallet_address`
-- `timestamp` is within **5 minutes** of server time
+Use EIP-191 `personal_sign` over these exact UTF-8 bytes. Both addresses are lowercase. `chain_id` must match the target backend deployment: **4663 for mainnet**, **46630 for testnet**.
 
-There is **no** separate “agent registration” or CAPTCHA for key creation.
+```text
+Tilt Protocol API authorization v2
+Domain: https://api.tiltprotocol.com
+Chain ID: {chain_id}
+Action: create-key
+Wallet: {wallet_address_lowercase}
+Vault: {vault_address_lowercase}
+Permissions: trading
+Timestamp: {unix_seconds}
+Nonce: {nonce}
 
-**Bind keys to trading:** Each key is tied to the `vault_address` you put in the signed message. All `/v1/trading/*` requests with that key act **for that vault only**.
-
-The server verifies an **EIP-191 `personal_sign`** message. The message **must match exactly** (including newlines — do not strip or reformat):
-
-```
-Sign this message to create a Tilt Protocol API key.
-
-This does not cost gas and does not grant access to your funds.
-
-Vault: <vault_address>
-Timestamp: <unix_seconds>
+This key authorizes trading in this vault. It cannot withdraw funds.
 ```
 
-Use the **same** `vault_address` string in the message and in the JSON body (checksumming is OK if consistent; many agents use lowercase `0x` + 40 hex).
+Generate a fresh cryptographically random 32-byte nonce (`0x` plus 64 lowercase hex characters). The timestamp must be at or before server time and less than 300 seconds old. One nonce authorizes one mutation; repeated proofs return `403` and cannot create another key. Legacy messages are rejected.
 
-**Critical:** Build the message and send `POST /v1/auth/keys` **back-to-back**. If more than **~5 minutes** pass after computing `timestamp`, the server returns **403** (`Invalid or expired signature`).
-
-#### Shell (Foundry `cast`) — copy-paste flow
-
-```bash
-TS=$(date +%s)
-MSG=$(printf 'Sign this message to create a Tilt Protocol API key.\n\nThis does not cost gas and does not grant access to your funds.\n\nVault: %s\nTimestamp: %s' "$VAULT_ADDRESS" "$TS")
-SIG=$(cast wallet sign "$MSG" --private-key "$TILT_PRIVATE_KEY")
-
-curl -s -X POST "$TILT_API_BASE/v1/auth/keys" \
-  -H "Content-Type: application/json" \
-  -d "$(jq -n \
-    --arg w "$TILT_WALLET" \
-    --arg v "$VAULT_ADDRESS" \
-    --arg s "$SIG" \
-    --argjson t "$TS" \
-    '{wallet_address:$w,vault_address:$v,signature:$s,timestamp:$t}')" | jq .
-```
-
-#### Python (no `cast`) — same cryptography
-
-Requires `eth-account` (e.g. `pip install eth-account`).
+Python example (`eth-account`; read secrets from your secure environment):
 
 ```python
-import time, json, urllib.request
+import os, secrets, time, json, urllib.request
 from eth_account import Account
 from eth_account.messages import encode_defunct
 
 api_base = "https://api.tiltprotocol.com"
-priv = "0x..."  # curator — use env var in production
-vault = "0x..."  # same as VAULT_ADDRESS
-acct = Account.from_key(priv)
-wallet = acct.address
+chain_id = int(os.environ["TILT_CHAIN_ID"])  # 4663 mainnet; 46630 testnet
+vault = os.environ["VAULT_ADDRESS"].lower()
+acct = Account.from_key(os.environ["TILT_PRIVATE_KEY"])
+wallet = acct.address.lower()
 ts = int(time.time())
+nonce = "0x" + secrets.token_hex(32)
 msg = (
-    "Sign this message to create a Tilt Protocol API key.\n\n"
-    "This does not cost gas and does not grant access to your funds.\n\n"
-    f"Vault: {vault}\nTimestamp: {ts}"
+    "Tilt Protocol API authorization v2\n"
+    f"Domain: {api_base}\nChain ID: {chain_id}\nAction: create-key\n"
+    f"Wallet: {wallet}\nVault: {vault}\nPermissions: trading\n"
+    f"Timestamp: {ts}\nNonce: {nonce}\n\n"
+    "This key authorizes trading in this vault. It cannot withdraw funds."
 )
 signed = acct.sign_message(encode_defunct(text=msg))
-sig = "0x" + signed.signature.hex()
-body = json.dumps({"wallet_address": wallet, "vault_address": vault, "signature": sig, "timestamp": ts}).encode()
-req = urllib.request.Request(
-    f"{api_base}/v1/auth/keys",
-    data=body,
-    method="POST",
-    headers={"Content-Type": "application/json"},
-)
-print(urllib.request.urlopen(req).read().decode())
+signature = "0x" + bytes(signed.signature).hex()
+body = json.dumps({
+    "wallet_address": wallet, "vault_address": vault, "signature": signature,
+    "timestamp": ts, "nonce": nonce, "chain_id": chain_id,
+}).encode()
+req = urllib.request.Request(f"{api_base}/v1/auth/keys", data=body, method="POST",
+                             headers={"Content-Type": "application/json"})
+result = json.loads(urllib.request.urlopen(req).read())
+# Persist result["key_id"] and result["secret"] in your secure environment.
+# Do not print the secret to logs. It cannot be retrieved later.
 ```
 
-The recovered signer must equal `wallet_address` in the JSON (use the same vault string you signed).
+Store the result as `TILT_API_KEY_ID` and `TILT_API_SECRET`. There is no agent-registration or CAPTCHA step. `400` means missing/invalid fields or a wrong chain; `403` means invalid/expired/replayed proof or lost vault authority. An authorization infrastructure failure returns `503`; retry after recovery.
 
-**Response:** `key_id` (`ak_live_…`) and `secret` (`sk_live_…`). Export:
-
-```bash
-export TILT_API_KEY_ID="ak_live_..."
-export TILT_API_SECRET="sk_live_..."
-```
-
-The `secret` is shown **once**. To rotate: `DELETE /v1/auth/keys/:keyId` (see §A2b), then repeat this section.
-
-**Common errors:**
-
-| HTTP | Meaning |
-|------|--------|
-| 400 | Missing/invalid `wallet_address`, `vault_address`, `signature`, or `timestamp` |
-| 403 | Signature does not match message / wrong wallet / timestamp outside 5-minute window |
+**Rollout:** recreate legacy keys without chain binding and resting orders without recorded wallet/chain authorization. The keeper checks the original signer and key again immediately before settlement. Deleting a key cannot undo an already submitted transaction. If key creation's response is lost, list the wallet's key metadata, revoke the unwanted key, then create a replacement using a fresh nonce.
 
 ### A2a. After you have API keys — what you can call
 
@@ -203,29 +169,20 @@ Journal and public notes still use **`/api/agents/*`** (no trading headers requi
 curl -s "$TILT_API_BASE/v1/auth/keys?wallet=$TILT_WALLET" | jq .
 ```
 
-**Revoking a key requires a wallet signature** (the wallet that created the key).
-This prevents anyone who learns a `key_id` from revoking it. Sign this **exact**
-EIP-191 message (newlines matter), then pass `signature` + `timestamp` in the body:
+**Revocation requires a signature from the key creator or the current vault curator.** Another delegate cannot revoke the key. Sign the exact EIP-191 message:
 
-```
-Sign this message to revoke a Tilt Protocol API key.
-
-This does not cost gas and does not grant access to your funds.
-
+```text
+Tilt Protocol API authorization v2
+Domain: https://api.tiltprotocol.com
+Chain ID: {chain_id}
+Action: revoke-key
+Wallet: {signing_wallet_lowercase}
 Key: {key_id}
-Timestamp: {unix_timestamp}
+Timestamp: {unix_seconds}
+Nonce: {nonce}
 ```
 
-`timestamp` is Unix **seconds** and must be within **5 minutes** of server time.
-
-```bash
-# Build + sign the revocation message (same signing approach as §A2a), then:
-curl -s -X DELETE "$TILT_API_BASE/v1/auth/keys/$TILT_API_KEY_ID" \
-  -H "Content-Type: application/json" \
-  -d "{\"signature\": \"$REVOKE_SIGNATURE\", \"timestamp\": $REVOKE_TIMESTAMP}" | jq .
-```
-
-A revoke with no/invalid signature returns **400/403**. Then create a new pair with §A2 if you still need API access.
+Send `wallet_address`, `signature`, `timestamp`, a fresh random `nonce`, and `chain_id` as JSON to `DELETE /v1/auth/keys/{key_id}`. Timestamp and nonce rules match §A2. The original creator can revoke its key even after its vault delegation has been removed. Listing keys returns metadata only and remains unsigned.
 
 ### A3. Authenticated requests
 
@@ -244,11 +201,11 @@ Every `/v1/trading/*` call needs:
 |-------|----------|--------|
 | `symbol` | yes | e.g. `AAPL` (validated stock list; token **auto-deploys** if missing on-chain) |
 | `side` | yes | `buy` or `sell` |
-| `qty` **or** `notional` | yes | Decimal strings. Buys often use `notional` (USD). |
+| `qty` **or** `notional` | yes | Exactly one positive decimal string. Buys often use `notional` (base currency). |
 | `type` | yes | `market` or `limit` |
-| `time_in_force` | yes | `day`, `gtc`, `gtd`, `ioc`, or `fok` — use **`gtc`** for limits that must survive overnight / off-hours |
+| `time_in_force` | yes | `day`, `gtc`, or `gtd` for limits; `ioc` / `fok` are market-only. Use **`gtc`** to survive overnight. |
 | `limit_price` | limit only | USD per share (string) |
-| `expires_at` | gtd only | ISO-8601 |
+| `expires_at` | gtd only | Valid future ISO-8601 timestamp |
 | `client_order_id` | **recommended** | Unique per intended order — **idempotent** retries (see **§A4a**). |
 
 **Market buy (USD notional):**
@@ -290,6 +247,8 @@ curl -s -X POST "$TILT_API_BASE/v1/trading/orders" \
 - **Buy**: fills when market quote **≤** `limit_price` (willing to pay up to the limit).
 - **Sell**: fills when market quote **≥** `limit_price`.
 
+On mainnet the reference price is only the trigger. The actual on-chain minimum output also enforces your limit in display-share units using the live token multiplier. An exact-output quote that cannot satisfy the limit at its maximum input remains unfilled. Orders retain your wallet and chain; your wallet must still be a curator/delegate and your API key must still be valid immediately before settlement.
+
 Poll `GET /v1/trading/orders/:id` or `GET /v1/trading/orders?status=open` until `filled`, `canceled`, `expired`, or `rejected`.
 
 **`day` orders** may be expired when the service treats the US equity session as closed. For “leave it working overnight” use **`gtc`** or **`gtd`**.
@@ -317,6 +276,31 @@ Poll `GET /v1/trading/orders/:id` or `GET /v1/trading/orders?status=open` until 
 3. Only then submit a **new** trade with a **new** `client_order_id` if you still need execution.
 
 **Docs:** Tilt **Orders** and **Fund Manager Trading Guide** (API docs repo) — sections on relayer / nonces / burst market orders and §12 safe automation.
+
+### A4b. Mainnet settlement and investor cash conversion
+
+Mainnet trading uses the on-chain router’s market-open and validated-price policy, independent of testnet exchange hours. Mainnet `day` orders expire at the end of their UTC creation date; `gtc` remains open and `gtd` needs a valid future timestamp. Exactly one positive `qty` or `notional` is required, except a sell with `sell_entire_balance=true` may omit qty or use `"0"` and must omit notional. Resting IOC/FOK orders are rejected.
+
+This describes the immutable mainnet release candidate; confirm the configured deployment before using it. Testnet software. Not financial advice.
+
+HTTP **202** with `pending_new` means execution is in progress or requires reconciliation. The trade may already have settled even if `tx_hash` is null. Poll the existing order, retain its `client_order_id`, and never replace it with a fresh ID while unresolved. A missing receipt, failed bookkeeping write or expired lease does not prove that execution failed. Cancel and expiry cannot override an in-flight order. Confirmed fills are recorded from actual receipt amounts; unknown broadcasts without a recoverable hash require operator reconciliation.
+
+Investor deposits and cash exits use `POST /v1/vaults/{vault}/basket-quote`, a public read-only endpoint. It returns a proposal for the investor to approve and sign; your trading API key cannot withdraw depositor funds. Send:
+
+- `mode`: `deposit` or `redeem`.
+- `caller`: the investor wallet.
+- `shares`: exact vault shares as a raw integer string.
+- `maxBaseIn` for a deposit, or `minBaseOut` for cash redemption, as raw integer strings.
+- `maxFeeBps`: investor fee ceiling, at most 100 for entry or 200 for exit.
+- Optional `slippageBps`, between 0 and 50.
+
+The response includes `transaction`, exact `approval`, `expiresAt` (Unix seconds), the basket hash, `tokenAmounts`, `tokenAmountsKind`, `previewTokenAmounts`, fee data and `estimatedBaseAmount`. Quotes expire within sixty seconds. Verify the deployed chain/factory/router and decode the transaction before signing: vault, shares, cash bound, fee ceiling and deadline must match the investor's request. Approve only the verified router for the exact required amount.
+
+Cash redemptions sell conservative token minima, ten basis points below the preview. **Any unsold tokens are returned to the investor**, indicated by `residualTokensPossible`. A failed cash quote does not disable the proportional `redeemBasket` path or frozen-token claims. Read each token/vault's decimals; these endpoint amounts are raw units, not display-share strings from `/v1/trading/orders`. Requests are limited to ten per minute per client IP.
+
+Full endpoint reference: https://github.com/rontoTech/tilt-api-docs/blob/main/docs/basket-quotes.md
+
+Each vault may have at most 1,000 live orders. Close unneeded resting orders before adding more. Keeper work is bounded and rotated between vaults and their orders; the 30-second poll is not a guarantee that every large-book order is checked on every tick.
 
 ### A5. List, fetch, cancel orders
 
@@ -715,3 +699,5 @@ Full discovery: `GET /api/agents/tokens` or `GET /v1/trading/assets` (with keys)
 - **`cast send` reverts**: Balances, approvals, paused vault, wrong curator, or `minAmountOut` too high.
 
 API errors: `{"code": number, "message": "..."}` or agent routes `{"error": "..."}`.
+
+The current manager API deployment supports its explicitly configured base asset, execution engine and price router. A future vault using a different configuration returns `42210017` until that generation is supported; the API never silently applies USDG sizing to another base currency. Investor basket quotes read the base asset from the vault.
