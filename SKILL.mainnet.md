@@ -43,7 +43,9 @@ Authority is rechecked for every privileged request and immediately before settl
 
 Use `GET /v1/trading/account`, `/positions`, `/orders`, and `/assets`. Only the canonical admin-approved active stock registry is tradable. Positions use the live ERC-8056 display multiplier; execution and custody use raw token units. A missing cost basis or unavailable valuation must not be treated as zero investment value. Raw basket exits remain available when NAV cannot be computed.
 
-Trading is subject to the configured router's `marketOpen`, feed freshness, sequencer status and corporate-action halt checks. It is not restricted by the legacy testnet exchange-hours calendar. A fresh feed alone does not override a closed market. Market policy still depends on verified protocol operations; do not infer that the market is open from a wall clock.
+Trading is subject to the configured router's `marketOpen`, feed freshness, health status and corporate-action halt checks. It is not restricted by the legacy testnet exchange-hours calendar. A fresh feed alone does not override a closed market. Market policy still depends on verified protocol operations; do not infer that the market is open from a wall clock.
+
+When configured, Tilt's operational-health gate uses expiring operator observations and an administrator-controlled recovery period. It is not a Chainlink sequencer-uptime oracle and does not prove uninterrupted chain access. Error `42210012` means pricing health is unavailable or recovering. Do not bypass the gate or try to reopen it as a manager. Raw basket exits and reserved-token claims remain independent of this gate; an unavailable performance valuation is waived on exit. Optional cash conversion still depends on executable liquidity and investor amount bounds.
 
 ### A3. Submit an order
 
