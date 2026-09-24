@@ -5,11 +5,29 @@ description: Manage isolated immutable tokenized-equity vaults on Tilt Protocol 
 metadata: {"openclaw": {"homepage": "https://tiltprotocol.com"}}
 ---
 
-# Tilt Protocol — mainnet fund manager
+# Tilt Protocol — mainnet beta fund manager
 
-This document describes the immutable basket-vault release candidate for Robinhood Chain, chain ID **4663**. It does not announce a deployment. Do not transact until the reviewed deployment addresses, feeds and routing permissions are configured and independently verified. Mainnet transactions move real value. The testnet chain ID is 46630. Testnet software. Not financial advice.
+**Status: configured and closed; activation pending.** Immutable basket contracts were deployed on September 22, 2026, on Robinhood Chain **4663**. Health recovery and funded verification are still pending. This beta has not been independently audited. Mainnet transactions move real value and can lose the entire deposit. Do not transact until beta activation is confirmed and the deployment's live permissions permit the operation. Not financial advice.
 
-Fetch this document each session from `GET https://api.tiltprotocol.com/api/agents/skill`. Read `GET /api/agents/contracts`, verify `chainId === 4663`, then check the connected RPC's `eth_chainId`. Mainnet responses include `vaultModel: "immutable-basket-v1"`, current ABIs, and only explicitly configured factory/router/lens addresses. A missing address means that feature is unavailable. Do not use testnet addresses or legacy `createUserVaultWithFees`, `deposit`, `redeem`, target-weight or allocation methods.
+Use this document only after the user explicitly selects mainnet. The default `SKILL.md` remains testnet, chain **46630**, at `https://api.tiltprotocol.com`, with the app at `https://testnet.tiltprotocol.com`. Do not automatically move a testnet agent, its orders, balances or API keys to mainnet.
+
+After explicit mainnet selection, set `MAINNET_API_URL=https://tilt-mainnet-api-production.up.railway.app`. This separate API is deployed, but its availability does not announce beta activation. Fetch this document each session from `GET ${MAINNET_API_URL}/api/agents/skill`. Read `GET /api/agents/contracts` on that same origin, verify `chainId === 4663`, then check the connected RPC's `eth_chainId`. Mainnet responses include `vaultModel: "immutable-basket-v1"`, current ABIs, and only explicitly configured factory/router/lens addresses. A missing address means that feature is unavailable. Do not use testnet addresses or legacy `createUserVaultWithFees`, `deposit`, `redeem`, target-weight or allocation methods.
+
+The mainnet app is `https://app.tiltprotocol.com`. Compare these deployed addresses with the live address book before signing:
+
+| Contract | Mainnet address |
+|---|---|
+| USDG | `0x5fc5360D0400a0Fd4f2af552ADD042D716F1d168` |
+| BasketVaultFactory | `0x463A6Db2731d4c5C5e9d937f7F9ccC82c2178D37` |
+| VaultRegistry | `0xA977dE2a44e7eA96075b0b222D785a4103Bce3E2` |
+| MainnetExecutionEngine | `0x2F73BBB4E73ad2CEdb2336ee74202D88D2f9709F` |
+| ChainlinkPriceRouter | `0xA8ce6799F609E393Be18C685C05bffc29C27C0Cc` |
+| TradeDelegateProxyV2 | `0x0f060b7b6331C27423c50fd386E27832AA410055` |
+| BasketRouter | `0xB200A060eC342Ef65471595e0D506C830deAd8c1` |
+| BasketVaultLens | `0x02eEFa923022E45F6f998e91a7Ad79bEbA9D5214` |
+| OperationalHealthGate | `0xa4d43f4eeE47ba94CFC7f9F8B14DA6C89B7c06a4` |
+
+Administration temporarily uses EOA `0x5387284206D648afE82240d2E303c20dc402D022`; it is not a Safe. A Safe handover is planned after audit. Immutable vault code does not remove trusted administrator powers over feeds, approved assets/providers and protocol fee settings.
 
 Keep wallet keys and API secrets private. Never send a wallet private key to Tilt. The API cannot withdraw investor funds. There is no mainnet faucet or agent-triggered deployment of stock tokens.
 
@@ -20,6 +38,8 @@ Keep wallet keys and API secrets private. Never send a wallet private key to Til
 Use the vault's current curator or an active delegate. `POST /v1/auth/keys` requires `wallet_address`, `vault_address`, `chain_id: 4663`, `timestamp`, `nonce`, and `signature`. Generate a cryptographically random 32-byte nonce, encoded as `0x` plus 64 lowercase hex characters. Timestamp is Unix seconds, at or before server time and less than 300 seconds old.
 
 Sign these exact EIP-191 UTF-8 bytes, using lowercase addresses:
+
+The `Domain` below is a fixed protocol signature domain. Preserve it exactly even though mainnet HTTP requests use the separate `MAINNET_API_URL`; the chain ID distinguishes the environments.
 
 ```text
 Tilt Protocol API authorization v2
@@ -43,7 +63,15 @@ Authority is rechecked for every privileged request and immediately before settl
 
 Use `GET /v1/trading/account`, `/positions`, `/orders`, and `/assets`. Only the canonical admin-approved active stock registry is tradable. Positions use the live ERC-8056 display multiplier; execution and custody use raw token units. A missing cost basis or unavailable valuation must not be treated as zero investment value. Raw basket exits remain available when NAV cannot be computed.
 
+On mainnet, `/assets` and `/assets/:symbol` return `price: null` with `price_available: false` when the validated reference is unavailable. `status: "active"` describes registry/feed and engine-allowlist eligibility; `tradable` also requires healthy stock/base references and an unpaused engine. Execution still checks vault permissions, caps, liquidity and issuer restrictions. Never gate raw exits or claims on this discovery flag. `/account` returns HTTP503/code `50310005`, `Vault valuation temporarily unavailable`, when the basket lens reports unavailable NAV; unexpected RPC/ABI/configuration failures remain generic HTTP500.
+
+The agent discovery routes `/api/agents/tokens`, `/tokens/:symbol` and `/stocks` return the enabled mainnet registry intersected with the engine allowlist. Their token-price fields are `priceUsd` and `priceAvailable`, with null/false when validated pricing is unavailable. Sponsored `/api/agents/register` returns HTTP409 on mainnet; use your own wallet for direct registration. Faucet and token deployment remain testnet-only.
+
+USDG is the beta base asset. The initial equity allowlist is **AAPL, MSFT, TSLA, GOOGL and NVDA**. Query the live registry before each new intent; do not assume additional listed Robinhood assets are enabled. Execution uses approved **0x and Uniswap** providers. Initial turnover limits are **1,000 USDG per vault** and **10,000 USDG protocol-wide**, conservatively counting the current and previous UTC day's usage. These are trading limits, not deposit or loss limits; a new UTC day does not necessarily restore full capacity.
+
 Trading is subject to the configured router's `marketOpen`, feed freshness, health status and corporate-action halt checks. It is not restricted by the legacy testnet exchange-hours calendar. A fresh feed alone does not override a closed market. Market policy still depends on verified protocol operations; do not infer that the market is open from a wall clock.
+
+The separate beta calendar uses regular U.S. equity sessions **09:30–16:00 America/New_York**, excluding holidays and observing early closes. Published 2026/2027 calendar coverage closes unsupported years. The upcoming early closes are **13:00 New York time on November 27 and December 24, 2026**, and **November 26, 2027**. This is Tilt's narrower beta policy, not Robinhood's complete issuer trading schedule. Current chain flags and validated prices still govern fills; mainnet DAY expiry remains UTC-based.
 
 When configured, Tilt's operational-health gate uses expiring operator observations and an administrator-controlled recovery period. It is not a Chainlink sequencer-uptime oracle and does not prove uninterrupted chain access. Error `42210012` means pricing health is unavailable or recovering. Do not bypass the gate or try to reopen it as a manager. Raw basket exits and reserved-token claims remain independent of this gate; an unavailable performance valuation is waived on exit. Optional cash conversion still depends on executable liquidity and investor amount bounds.
 
@@ -78,7 +106,7 @@ A durable broadcast-intent marker precedes sending. Expiring a lease is not proo
 
 ## B. Create an immutable vault
 
-Read the configured `basketVaultFactory` and its ABI from the address book, verify deployment code, then read `baseAsset()` and `newVaultConfigHash()` together. Read token decimals; approve only the reviewed factory for the intended seed amount. Call:
+Read the configured `basketVaultFactory` and its ABI from the address book, verify deployment code and that `creationPaused()` is false, then read `baseAsset()` and `newVaultConfigHash()` together. A closed factory is not permission to bypass the gate or create a replacement deployment. Read token decimals; approve only the reviewed factory for the intended seed amount. Call:
 
 ```text
 createVault(name,symbol,managementBps,performanceBps,seedAmount,metadataURI,expectedConfig)
