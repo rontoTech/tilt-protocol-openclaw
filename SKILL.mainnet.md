@@ -55,7 +55,22 @@ Nonce: {nonce}
 This key authorizes trading in this vault. It cannot withdraw funds.
 ```
 
-Save the returned `key_id` and one-time `secret` securely. Authenticated trading requests use both `TILT-API-KEY-ID` and `TILT-API-SECRET`. Signatures are single-use. Old unbound keys must be recreated. See the [authentication reference](https://github.com/rontoTech/tilt-api-docs/blob/main/docs/authentication.md) for exact signed key revocation and rotation messages.
+Save the returned `key_id` and one-time `secret` securely. Authenticated trading requests use both `TILT-API-KEY-ID` and `TILT-API-SECRET`. Signatures are single-use. Old unbound keys must be recreated.
+
+To revoke a mainnet key, the key creator or the vault's current curator signs these exact EIP-191 bytes. Use a lowercase signing address, the exact key ID, a fresh nonce and the same timestamp rules as creation:
+
+```text
+Tilt Protocol API authorization v2
+Domain: https://api.tiltprotocol.com
+Chain ID: 4663
+Action: revoke-key
+Wallet: {signing_wallet_lowercase}
+Key: {key_id}
+Timestamp: {unix_seconds}
+Nonce: {nonce}
+```
+
+Send `wallet_address`, `signature`, `timestamp`, `nonce` and `chain_id: 4663` as JSON to `DELETE ${MAINNET_API_URL}/v1/auth/keys/{key_id}`. Another delegate cannot revoke the key. The original creator can revoke its key after losing vault authority. A successful response includes `success: true`; an invalid, expired or replayed proof returns HTTP403. `GET ${MAINNET_API_URL}/v1/auth/keys?wallet={wallet_address}` lists key metadata without secrets. To rotate, revoke the old key and create a replacement with a new nonce; never reuse a signed proof. The default testnet skill uses its own deployed authentication flow and must not be substituted here.
 
 Authority is rechecked for every privileged request and immediately before settlement. Revoking a key or removing its wallet as a curator/delegate prevents subsequent execution of its resting orders. RPC or Redis failures authorize no action. A transaction already broadcast cannot be revoked by deleting a key.
 
@@ -136,7 +151,7 @@ A raw redemption remains callable during pause, market closure or unavailable pr
 
 The response contains `approval`, `transaction`, `expiresAt` in Unix seconds, `basketHash`, `tokenAmounts`, `tokenAmountsKind`, `previewTokenAmounts`, `estimatedBaseAmount`, fee data and `residualTokensPossible`. It expires within sixty seconds. Independently verify the chain, vault, locally configured router, token/spender, shares, cash bound, fee ceiling and encoded deadline before signing. Use only the needed allowance. The endpoint never needs a wallet secret.
 
-Deposits buy the existing proportional basket before minting net shares. Cash redemption sells conservative token minima (10 basis points below preview entitlements) and **returns any unsold tokens**. It is not a guaranteed all-cash exit. Required venue liquidity or token restrictions may make cash conversion fail; raw basket redemption remains the fallback. See the [basket quote reference](https://github.com/rontoTech/tilt-api-docs/blob/main/docs/basket-quotes.md).
+Deposits buy the existing proportional basket before minting net shares. Cash redemption sells conservative token minima (10 basis points below preview entitlements) and **returns any unsold tokens**. It is not a guaranteed all-cash exit. Required venue liquidity or token restrictions may make cash conversion fail; raw basket redemption remains the fallback.
 
 ## D. Unsupported legacy administration
 
